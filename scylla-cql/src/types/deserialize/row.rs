@@ -178,6 +178,37 @@ impl<'frame, 'metadata> DeserializeRow<'frame, 'metadata> for Row {
     }
 }
 
+use std::collections::HashMap;
+impl <'frame, 'meta, A> DeserializeRow<'frame, 'meta> for HashMap<String, A>
+where
+    A : DeserializeValue<'frame, 'meta>
+{
+    fn type_check(specs: &[ColumnSpec]) -> Result<(), TypeCheckError> {
+        let _: Result<(), TypeCheckError>  =
+            specs
+                .iter()
+                .map(|c|{
+                    let _ = <A as DeserializeValue<'frame, 'meta>>::type_check(c.typ())?;
+                    Ok(())
+                }).collect();
+        Ok(())
+    }
+
+    fn deserialize(row: ColumnIterator<'frame, 'meta>) -> Result<Self, DeserializationError> {
+        let mut res = HashMap::with_capacity(row.columns_remaining());
+        let _ : Result<(), DeserializationError>= row
+            .into_iter()
+            .map(|c| {
+                let col = c?;
+                let val = <A as DeserializeValue<'frame, 'meta>>::deserialize(col.spec.typ(), col.slice)?;
+                res.insert(col.spec.name().to_owned(), val);
+                Ok(())
+            }).collect();
+        Ok(res)
+
+    }
+}
+
 // tuples
 //
 /// This is the new encouraged way for deserializing a row.
